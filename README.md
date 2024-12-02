@@ -35,17 +35,17 @@ DB_URI=mongodb://localhost:27017/
 DB_NAME=build_dashboard
 
 # AWS S3 (for artifacts)
-AWS_ACCESS_KEY=your_access_key
-AWS_SECRET_KEY=your_secret_key
-AWS_REGION=your_region
-S3_BUCKET=your_bucket_name
+AWS_ACCESS_KEY=our_access_key
+AWS_SECRET_KEY=our_secret_key
+AWS_REGION=our_region
+S3_BUCKET=our_bucket_name
 
 # SendGrid (for email notifications)
-SENDGRID_API_KEY=your_sendgrid_api_key
+SENDGRID_API_KEY=our_sendgrid_api_key
 NOTIFICATION_FROM_EMAIL=builds@your-domain.com
 
 # JWT Authentication
-JWT_SECRET_KEY=your_secret_key
+JWT_SECRET_KEY=our_secret_key
 JWT_ALGORITHM=HS256
 ```
 
@@ -65,7 +65,7 @@ projects:
     build_command: cmake . && make
     build_dir: ./ieee-mlir-build
     notification_emails:
-      - tscott@amd.com
+      - <todo>@amd.com
 
   llvm-mlir:
     repo_url: https://github.com/llvm/llvm-project
@@ -75,7 +75,7 @@ projects:
         -DLLVM_BUILD_EXAMPLES=ON && ninja
     build_dir: ./llvm-mlir-build
     notification_emails:
-      - mbreius@amd.com
+      - <todo>@amd.com
 ```
 
 ## Extended Features Implementation
