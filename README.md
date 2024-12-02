@@ -61,7 +61,7 @@ projects:
       - team@amd.com
     
   ieee-mlir:
-    repo_url: https://github.com/ieee-mlir/ieee-mlir
+    repo_url: https://github.com/iree-org/iree
     build_command: cmake . && make
     build_dir: ./ieee-mlir-build
     notification_emails:
