@@ -49,7 +49,7 @@ pip install -r requirements.txt
 
 2. Run the Streamlit application:
 ```bash
-streamlit run src/pytorch-hud-backend.py
+streamlit run src/main.py
 ```
 
 3. The application should automatically open in your default web browser. If it doesn't, you can access it at the URL shown in the terminal (typically `http://localhost:8501`)
