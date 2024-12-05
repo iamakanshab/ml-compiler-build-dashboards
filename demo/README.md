@@ -1,14 +1,24 @@
-# Build Dashboard 
+# Build Dashboard
 
-A Streamlit dashboard for monitoring PyTorch CI/CD workflow runs in real-time. This application provides a clean, intuitive interface for tracking workflow status, build progress, and test results.
+A Streamlit dashboard for monitoring PyTorch CI/CD workflows and metrics in real-time. This application provides a comprehensive view of both high-level metrics and detailed workflow status.
 
 ## Features
 
-- Real-time workflow monitoring
+### Metrics Dashboard
+- Real-time monitoring of key performance indicators
+- Build success/failure rates and trends
+- Queue time monitoring and alerts
+- Visual trends with charts and graphs
+- Automated alerts for:
+  - Jobs exceeding queue time thresholds
+  - High build failure rates
+
+### Workflow Monitor
+- Real-time workflow status tracking
 - Status-based filtering (Success, Failed, Running, Pending, Warning)
 - Branch and author filtering
 - Auto-refresh capability
-- Detailed job information for each workflow
+- Detailed job information
 - Color-coded status indicators
 - Duration tracking
 
@@ -22,9 +32,9 @@ pytorch-hud-demo/
 │
 └── src/
     ├── __init__.py
-    ├── main.py
-    ├── models.py
-    └── schema.py
+    ├── main.py        # Main application with UI components
+    ├── models.py      # Data models and enums
+    └── schema.py      # Sample data generator
 ```
 
 ## Prerequisites
@@ -82,35 +92,54 @@ streamlit run src/main.py
 
 ## Application Usage
 
+### Metrics Dashboard (Tab 1)
+1. View key metrics:
+   - Current queued jobs
+   - Average queue time
+   - Build success rate
+   - Average build time
+2. Monitor trends:
+   - Queue time trends (line chart)
+   - Build success/failure trends (bar chart)
+3. Automated alerts for:
+   - Queue time threshold violations
+   - High failure rates
+
+### Workflow Monitor (Tab 2)
 1. **Viewing Workflows**
-   - The main page displays all recent workflow runs
-   - Expandable cards show detailed information for each workflow
-   - Failed and running workflows are automatically expanded
+   - Expandable cards show detailed information
+   - Failed and running workflows auto-expand
+   - Color-coded status indicators
 
 2. **Filtering**
-   - Use the Filters expander to filter by:
+   - Filter by:
      - Branch (main, nightly)
      - Status (success, failed, running, pending, warning)
      - Author
 
 3. **Auto-refresh**
-   - Toggle auto-refresh to automatically update the display every 30 seconds
-   - Use the Refresh button for manual updates
+   - Toggle auto-refresh for 30-second updates
+   - Manual refresh button available
 
 ## Development
 
-To modify the demo data or add new features:
-1. Update sample workflows in `schema.py`
+To modify the application:
+1. Update metrics and sample data in `schema.py`
 2. Modify data models in `models.py`
-3. Update the UI components in `main.py`
+3. Update UI components in `main.py`
+
+Current metrics include:
+- Build metrics (success rates, failures)
+- Queue metrics (wait times, thresholds)
+- Historical trends
 
 ## Troubleshooting
 
-If you encounter import errors:
-- Make sure you're running the application from the project root directory
-- Verify that all required packages are installed
-- Check that the virtual environment is activated
-- Try running with the full path to the streamlit executable in the virtual environment
+Common issues and solutions:
+- **Import errors**: Ensure you're running from the project root directory
+- **Streamlit not found**: Verify virtual environment is activated
+- **Module not found**: Check all required packages are installed
+- **Streamlit command not recognized**: Use the full path to streamlit.exe in the virtual environment
 
 ## License
 
