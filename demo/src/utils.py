@@ -1,4 +1,6 @@
 # app/utils.py
+from datetime import datetime
+
 def calculate_duration(start_time: datetime) -> str:
     duration = datetime.utcnow() - start_time
     minutes = duration.total_seconds() / 60

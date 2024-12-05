@@ -3,7 +3,7 @@
 import asyncio
 from datetime import datetime
 from .database import SessionLocal
-from .github_client import GitHubClient
+from github_client import GitHubClient
 from .models import Workflow, Job, StatusEnum
 
 class WorkflowPoller:

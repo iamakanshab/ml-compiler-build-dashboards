@@ -1,10 +1,7 @@
-# app/models.py
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Enum
-from sqlalchemy.orm import declarative_base, relationship
-import enum
+from dataclasses import dataclass
 from datetime import datetime
-
-Base = declarative_base()
+from typing import List, Optional
+import enum
 
 class StatusEnum(str, enum.Enum):
     SUCCESS = "success"
@@ -13,26 +10,21 @@ class StatusEnum(str, enum.Enum):
     PENDING = "pending"
     WARNING = "warning"
 
-class Workflow(Base):
-    __tablename__ = "workflows"
+@dataclass
+class Job:
+    name: str
+    status: StatusEnum
+    duration: str
+    error: Optional[str] = None
 
-    id = Column(Integer, primary_key=True)
-    name = Column(String)
-    branch = Column(String)
-    commit = Column(String)
-    author = Column(String)
-    status = Column(Enum(StatusEnum))
-    start_time = Column(DateTime, default=datetime.utcnow)
-    duration = Column(String)
-    jobs = relationship("Job", back_populates="workflow", cascade="all, delete-orphan")
-
-class Job(Base):
-    __tablename__ = "jobs"
-
-    id = Column(Integer, primary_key=True)
-    workflow_id = Column(Integer, ForeignKey("workflows.id"))
-    name = Column(String)
-    status = Column(Enum(StatusEnum))
-    duration = Column(String)
-    error = Column(String, nullable=True)
-    workflow = relationship("Workflow", back_populates="jobs")
+@dataclass
+class Workflow:
+    id: str
+    name: str
+    branch: str
+    commit: str
+    author: str
+    status: StatusEnum
+    start_time: datetime
+    duration: str
+    jobs: List[Job]

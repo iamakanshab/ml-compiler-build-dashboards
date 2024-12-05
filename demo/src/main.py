@@ -1,52 +1,112 @@
-# app/main.py
-from fastapi import FastAPI, Depends, HTTPException
-from sqlalchemy.orm import Session
-from typing import List
-from . import models, schemas
-from .database import get_db, init_db
-from datetime import datetime, timedelta
-import uuid
+import streamlit as st
+import pandas as pd
+import time
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent))
+from models import StatusEnum
+from schema import get_sample_workflows
 
-app = FastAPI(title="PyTorch HUD API")
+# Styling helpers
+def get_status_color(status: StatusEnum) -> str:
+    colors = {
+        StatusEnum.SUCCESS: "success",
+        StatusEnum.FAILED: "error",
+        StatusEnum.RUNNING: "info",
+        StatusEnum.PENDING: "secondary",
+        StatusEnum.WARNING: "warning"
+    }
+    return colors.get(status, "secondary")
 
-@app.on_event("startup")
-async def startup_event():
-    init_db()
+def format_time(dt) -> str:
+    return dt.strftime("%H:%M:%S")
 
-@app.get("/workflows/", response_model=List[schemas.Workflow])
-def get_workflows(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    workflows = db.query(models.Workflow).offset(skip).limit(limit).all()
-    return workflows
+# Main app
+def main():
+    st.set_page_config(
+        page_title="PyTorch HUD",
+        page_icon="🔥",
+        layout="wide"
+    )
 
-@app.get("/workflows/{workflow_id}", response_model=schemas.Workflow)
-def get_workflow(workflow_id: int, db: Session = Depends(get_db)):
-    workflow = db.query(models.Workflow).filter(models.Workflow.id == workflow_id).first()
-    if workflow is None:
-        raise HTTPException(status_code=404, detail="Workflow not found")
-    return workflow
+    # Header
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        st.title("🔥 PyTorch HUD")
+        st.caption("Showing recent workflow runs")
+    with col2:
+        st.button("🔄 Refresh", type="primary")
+        auto_refresh = st.toggle("Auto-refresh")
 
-@app.post("/workflows/", response_model=schemas.Workflow)
-def create_workflow(workflow: schemas.WorkflowCreate, db: Session = Depends(get_db)):
-    db_workflow = models.Workflow(**workflow.dict())
-    db.add(db_workflow)
-    db.commit()
-    db.refresh(db_workflow)
-    return db_workflow
+    # Filters
+    with st.expander("Filters"):
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.selectbox("Branch", ["All", "main", "nightly"])
+        with col2:
+            st.selectbox("Status", ["All"] + [s.value for s in StatusEnum])
+        with col3:
+            st.selectbox("Author", ["All", "pytorch-bot", "contributor"])
 
-@app.post("/workflows/{workflow_id}/jobs/", response_model=schemas.Job)
-def create_job(workflow_id: int, job: schemas.JobCreate, db: Session = Depends(get_db)):
-    db_job = models.Job(**job.dict(), workflow_id=workflow_id)
-    db.add(db_job)
-    db.commit()
-    db.refresh(db_job)
-    return db_job
+    # Workflows
+    workflows = get_sample_workflows()
+    for workflow in workflows:
+        with st.container():
+            # Main workflow card
+            with st.expander(
+                f"{workflow.name} ({workflow.status.value})",
+                expanded=workflow.status in [StatusEnum.RUNNING, StatusEnum.FAILED]
+            ):
+                # Workflow header
+                col1, col2, col3 = st.columns([2, 2, 1])
+                with col1:
+                    st.caption(f"Branch: {workflow.branch}")
+                    st.caption(f"Commit: {workflow.commit}")
+                with col2:
+                    st.caption(f"Author: {workflow.author}")
+                    st.caption(f"Started: {format_time(workflow.start_time)}")
+                with col3:
+                    st.caption(f"Duration: {workflow.duration}")
+                    st.markdown(
+                        f"<span style='color: {get_status_color(workflow.status)};'>"
+                        f"●</span> {workflow.status.value.title()}",
+                        unsafe_allow_html=True
+                    )
 
-@app.put("/workflows/{workflow_id}/status", response_model=schemas.Workflow)
-def update_workflow_status(workflow_id: int, status: StatusEnum, db: Session = Depends(get_db)):
-    workflow = db.query(models.Workflow).filter(models.Workflow.id == workflow_id).first()
-    if workflow is None:
-        raise HTTPException(status_code=404, detail="Workflow not found")
-    workflow.status = status
-    db.commit()
-    db.refresh(workflow)
-    return workflow
+                # Jobs table
+                jobs_data = [
+                    {
+                        "Job": job.name,
+                        "Status": job.status.value,
+                        "Duration": job.duration,
+                        "Error": job.error or ""
+                    }
+                    for job in workflow.jobs
+                ]
+                df = pd.DataFrame(jobs_data)
+                
+                # Style the dataframe
+                def style_status(val):
+                    color = get_status_color(StatusEnum(val))
+                    return f'color: {color};'
+                
+                styled_df = df.style.applymap(
+                    style_status, 
+                    subset=['Status']
+                )
+                
+                st.dataframe(
+                    styled_df,
+                    use_container_width=True,
+                    hide_index=True
+                )
+
+        st.markdown("---")
+
+    # Auto-refresh logic
+    if auto_refresh:
+        time.sleep(30)
+        st.rerun()
+
+if __name__ == "__main__":
+    main()
