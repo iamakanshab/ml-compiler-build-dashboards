@@ -1,4 +1,11 @@
 import streamlit as st
+# Set page config at the very beginning
+st.set_page_config(
+    page_title="Build Dashboard",
+    page_icon="🔥",
+    layout="wide"
+)
+
 import pandas as pd
 import time
 import sys
@@ -176,12 +183,6 @@ def render_workflow_dashboard():
         st.markdown("---")
 
 def main():
-    st.set_page_config(
-        page_title="Build Dashboard",
-        page_icon="🔥",
-        layout="wide"
-    )
-
     # Header
     col1, col2 = st.columns([3, 1])
     with col1:
