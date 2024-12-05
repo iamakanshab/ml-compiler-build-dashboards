@@ -177,7 +177,7 @@ def render_workflow_dashboard():
 
 def main():
     st.set_page_config(
-        page_title="PyTorch HUD",
+        page_title="Build Dashboard",
         page_icon="🔥",
         layout="wide"
     )
@@ -185,7 +185,7 @@ def main():
     # Header
     col1, col2 = st.columns([3, 1])
     with col1:
-        st.title("🔥 PyTorch HUD")
+        st.title("🔥 Build Dashboard")
         st.caption("Real-time monitoring dashboard")
     with col2:
         st.button("🔄 Refresh", type="primary")
