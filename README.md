@@ -52,7 +52,7 @@ WS_ENDPOINT=wss://your-api-gateway-url
 WS_REGION=us-east-1
 
 # Database
-MONGODB_URI=mongodb://localhost:27017/
+MYSQL_URI=mongodb://localhost:27017/
 DB_NAME=build_dashboard
 
 # AWS Services
