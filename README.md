@@ -1,55 +1,79 @@
 # ML Compiler Build Dashboard
 
-A comprehensive build monitoring system for ML compiler projects, tracking build status, failures, and progress across multiple projects including torch-mlir, ieee-mlir, and LLVM-MLIR.
+A real-time build monitoring system for ML compiler projects using secure WebSocket connections. Track build status, failures, and progress across torch-mlir, ieee-mlir, and LLVM-MLIR projects through a unified interface.
 
 ## Features
 
-- Real-time build status monitoring
-- Multi-project support with unified interface
-- Build failure tracking and analysis
-- Email notifications for build status
-- Artifact storage and management
-- Authentication and user management
-- Detailed build logs and history
-- Git integration and repository management
+- 🔄 Real-time WebSocket-based build monitoring
+- 🔒 Secure bidirectional communication (no webhooks)
+- 🏗️ ML compiler project support:
+  - torch-mlir
+  - ieee-mlir
+  - LLVM-MLIR
+- 📊 Build metrics and failure analysis
+- 📦 S3-based artifact management
+- 📧 Email notifications via SendGrid
+- 🔐 JWT-based authentication
+- 📝 Comprehensive build logs
+- 📈 Historical data analysis
 
-## Installation
+## Architecture
 
-### Prerequisites
+The system uses a WebSocket-based architecture for real-time communication:
+<link from design doc>
+
+## Prerequisites
+
+### System Requirements
+- Python 3.8+
+- Node.js 18+
+- MongoDB
+- AWS Account
+- SendGrid Account
+
+### Dependencies
 
 ```bash
-# Backend dependencies
-pip install flask flask-cors gitpython pymongo sqlalchemy boto3 python-jose[cryptography] sendgrid
+# Backend
+pip install flask flask-cors gitpython pymongo boto3 python-jose[cryptography] sendgrid
 
-# Frontend dependencies
+# Frontend
 npm install @sendgrid/mail aws-sdk bcrypt jsonwebtoken
 ```
 
-### Configuration
+## Configuration
 
-1. Create a `.env` file in the root directory:
+### Environment Setup
+
+Create a `.env` file:
 
 ```env
+# WebSocket Configuration
+WS_ENDPOINT=wss://your-api-gateway-url
+WS_REGION=us-east-1
+
 # Database
-DB_URI=mongodb://localhost:27017/
+MONGODB_URI=mongodb://localhost:27017/
 DB_NAME=build_dashboard
 
-# AWS S3 (for artifacts)
-AWS_ACCESS_KEY=our_access_key
-AWS_SECRET_KEY=our_secret_key
-AWS_REGION=our_region
-S3_BUCKET=our_bucket_name
+# AWS Services
+AWS_ACCESS_KEY=your_key
+AWS_SECRET_KEY=your_secret
+AWS_REGION=us-east-1
+S3_BUCKET=build-artifacts
 
-# SendGrid (for email notifications)
-SENDGRID_API_KEY=our_sendgrid_api_key
-NOTIFICATION_FROM_EMAIL=builds@your-domain.com
-
-# JWT Authentication
-JWT_SECRET_KEY=our_secret_key
+# Authentication
+JWT_SECRET_KEY=your_jwt_secret
 JWT_ALGORITHM=HS256
+
+# Notifications
+SENDGRID_API_KEY=your_sendgrid_key
+NOTIFICATION_EMAIL=builds@your-domain.com
 ```
 
-2. Update `config.yaml` with your project settings:
+### Project Configuration
+
+Create `config.yaml`:
 
 ```yaml
 projects:
@@ -58,14 +82,18 @@ projects:
     build_command: python setup.py build
     build_dir: ./torch-mlir-build
     notification_emails:
-      - team@amd.com
+      - team@example.com
+    websocket:
+      reconnect_attempts: 5
+      reconnect_interval: 1000
     
   ieee-mlir:
     repo_url: https://github.com/ieee-mlir/ieee-mlir
     build_command: cmake . && make
     build_dir: ./ieee-mlir-build
-    notification_emails:
-      - <todo>@amd.com
+    websocket:
+      reconnect_attempts: 3
+      reconnect_interval: 2000
 
   llvm-mlir:
     repo_url: https://github.com/llvm/llvm-project
@@ -74,289 +102,174 @@ projects:
         -DLLVM_ENABLE_PROJECTS=mlir \
         -DLLVM_BUILD_EXAMPLES=ON && ninja
     build_dir: ./llvm-mlir-build
-    notification_emails:
-      - <todo>@amd.com
 ```
 
-## Extended Features Implementation
+## Implementation
 
-### 1. Project Configuration
-
-Add new projects by updating `config.yaml`. Each project supports:
-
-- Custom build commands
-- Multiple build stages
-- Branch-specific configurations
-- Custom notification settings
-- Artifact retention policies
-
-Example addition:
-
-```yaml
-new-project:
-  repo_url: https://github.com/org/project
-  build_command: make all
-  build_dir: ./project-build
-  branches:
-    main:
-      notification_threshold: error_only
-    develop:
-      notification_threshold: all
-  artifacts:
-    retention_days: 30
-    patterns:
-      - "*.whl"
-      - "*.tar.gz"
-```
-
-### 2. Authentication System
+### Build Agent Setup
 
 ```python
-# backend/auth.py
-from datetime import datetime, timedelta
-from typing import Optional
-from jose import JWTError, jwt
-from passlib.context import CryptContext
-from pydantic import BaseModel
+from build_dashboard import BuildAgent
 
-class Auth:
-    def __init__(self):
-        self.pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-        self.SECRET_KEY = os.getenv("JWT_SECRET_KEY")
-        self.ALGORITHM = os.getenv("JWT_ALGORITHM")
+agent = BuildAgent(
+    project_name="torch-mlir",
+    api_key="your_api_key",
+    ws_endpoint="wss://your-api-gateway-url"
+)
 
-    def create_access_token(self, data: dict):
-        to_encode = data.copy()
-        expire = datetime.utcnow() + timedelta(minutes=60)
-        to_encode.update({"exp": expire})
-        return jwt.encode(to_encode, self.SECRET_KEY, algorithm=self.ALGORITHM)
+@agent.on_build_start
+def handle_build_start(build_id):
+    print(f"Build {build_id} started")
 
-    def verify_token(self, token: str):
-        try:
-            payload = jwt.decode(token, self.SECRET_KEY, algorithms=[self.ALGORITHM])
-            return payload
-        except JWTError:
-            return None
+@agent.on_build_complete
+def handle_build_complete(build_id, status):
+    print(f"Build {build_id} completed with status: {status}")
+
+agent.start()
 ```
 
-### 3. Build Artifacts Storage
+### WebSocket Message Protocol
 
-```python
-# backend/artifacts.py
-import boto3
-from botocore.exceptions import ClientError
-import os
+```typescript
+// Build Event Message
+interface BuildMessage {
+    type: 'BUILD_START' | 'BUILD_UPDATE' | 'BUILD_COMPLETE';
+    buildId: string;
+    project: string;
+    data: {
+        status: string;
+        progress?: number;
+        metrics?: BuildMetrics;
+        error?: string;
+    };
+    timestamp: number;
+}
 
-class ArtifactStorage:
-    def __init__(self):
-        self.s3 = boto3.client(
-            's3',
-            aws_access_key_id=os.getenv('AWS_ACCESS_KEY'),
-            aws_secret_access_key=os.getenv('AWS_SECRET_KEY'),
-            region_name=os.getenv('AWS_REGION')
-        )
-        self.bucket = os.getenv('S3_BUCKET')
-
-    def upload_artifact(self, build_id: str, file_path: str):
-        try:
-            file_name = os.path.basename(file_path)
-            key = f"builds/{build_id}/{file_name}"
-            self.s3.upload_file(file_path, self.bucket, key)
-            return f"s3://{self.bucket}/{key}"
-        except ClientError as e:
-            return None
-
-    def get_artifact_url(self, build_id: str, file_name: str):
-        try:
-            key = f"builds/{build_id}/{file_name}"
-            url = self.s3.generate_presigned_url(
-                'get_object',
-                Params={'Bucket': self.bucket, 'Key': key},
-                ExpiresIn=3600
-            )
-            return url
-        except ClientError as e:
-            return None
+// Subscription Message
+interface SubscriptionMessage {
+    type: 'SUBSCRIBE';
+    projects: string[];
+    events: string[];
+}
 ```
 
-### 4. Email Notifications
+### API Routes
 
-```python
-# backend/notifications.py
-from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail
-import os
+```typescript
+// WebSocket Routes
+const routes = {
+    $connect: handleConnect,
+    $disconnect: handleDisconnect,
+    build_update: handleBuildUpdate,
+    subscribe: handleSubscribe
+};
 
-class NotificationSystem:
-    def __init__(self):
-        self.sg = SendGridAPIClient(os.getenv('SENDGRID_API_KEY'))
-        self.from_email = os.getenv('NOTIFICATION_FROM_EMAIL')
-
-    def send_build_notification(self, build_info: dict, recipients: list):
-        status = build_info['status']
-        project = build_info['project_name']
-        
-        subject = f"Build {status.upper()}: {project}"
-        content = self._generate_email_content(build_info)
-        
-        message = Mail(
-            from_email=self.from_email,
-            to_emails=recipients,
-            subject=subject,
-            html_content=content
-        )
-        
-        try:
-            self.sg.send(message)
-            return True
-        except Exception as e:
-            print(f"Failed to send notification: {e}")
-            return False
-
-    def _generate_email_content(self, build_info: dict) -> str:
-        return f"""
-        <h2>Build {build_info['status'].upper()}: {build_info['project_name']}</h2>
-        <p>Branch: {build_info['branch']}</p>
-        <p>Commit: {build_info['commit_hash']}</p>
-        <p>Duration: {build_info['duration']} minutes</p>
-        {'<p>Error: ' + build_info['error_message'] + '</p>' if build_info.get('error_message') else ''}
-        <p><a href="{build_info['dashboard_url']}">View in Dashboard</a></p>
-        """
+// REST API Routes
+app.get('/api/builds', listBuilds);
+app.get('/api/builds/:id', getBuildDetails);
+app.get('/api/builds/:id/logs', getBuildLogs);
+app.get('/api/builds/:id/artifacts', listArtifacts);
+app.post('/api/auth/login', login);
 ```
 
-### 5. Detailed Build Logs
+## Development
 
-```python
-# backend/logging.py
-import logging
-from datetime import datetime
-import os
+### Local Setup
 
-class BuildLogger:
-    def __init__(self, build_id: str):
-        self.build_id = build_id
-        self.log_dir = f"logs/builds/{build_id}"
-        os.makedirs(self.log_dir, exist_ok=True)
-        
-        self.logger = logging.getLogger(f"build_{build_id}")
-        self.logger.setLevel(logging.DEBUG)
-        
-        # File handler for complete logs
-        fh = logging.FileHandler(f"{self.log_dir}/full.log")
-        fh.setLevel(logging.DEBUG)
-        
-        # File handler for errors only
-        eh = logging.FileHandler(f"{self.log_dir}/errors.log")
-        eh.setLevel(logging.ERROR)
-        
-        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-        fh.setFormatter(formatter)
-        eh.setFormatter(formatter)
-        
-        self.logger.addHandler(fh)
-        self.logger.addHandler(eh)
-
-    def log_build_step(self, step: str, status: str, message: str = None):
-        self.logger.info(f"Step: {step} - Status: {status}" + (f" - {message}" if message else ""))
-
-    def log_error(self, error_message: str):
-        self.logger.error(error_message)
-
-    def get_log_content(self, log_type: str = 'full') -> str:
-        log_file = f"{self.log_dir}/{log_type}.log"
-        if os.path.exists(log_file):
-            with open(log_file, 'r') as f:
-                return f.read()
-        return ""
+1. Start local services:
+```bash
+docker-compose up -d mongodb
 ```
 
-### 6. Build Metrics and Analytics
-
-```python
-# backend/analytics.py
-from datetime import datetime, timedelta
-from typing import Dict, List
-import pandas as pd
-
-class BuildAnalytics:
-    def __init__(self, db_connection):
-        self.db = db_connection
-
-    def get_build_metrics(self, days: int = 30) -> Dict:
-        start_date = datetime.now() - timedelta(days=days)
-        builds = self.db.get_builds_since(start_date)
-        
-        df = pd.DataFrame(builds)
-        
-        return {
-            'total_builds': len(df),
-            'success_rate': (df['status'] == 'success').mean() * 100,
-            'average_duration': df['duration'].mean(),
-            'failure_distribution': df[df['status'] == 'failed']['error_type'].value_counts().to_dict(),
-            'builds_per_day': df.groupby(df['start_time'].dt.date).size().to_dict(),
-            'projects_summary': self._get_projects_summary(df)
-        }
-
-    def _get_projects_summary(self, df: pd.DataFrame) -> Dict:
-        return {
-            project: {
-                'total_builds': len(project_df),
-                'success_rate': (project_df['status'] == 'success').mean() * 100,
-                'average_duration': project_df['duration'].mean(),
-                'last_successful_build': project_df[project_df['status'] == 'success']['end_time'].max()
-            }
-            for project, project_df in df.groupby('project_name')
-        }
-
-    def get_build_trends(self, days: int = 30) -> Dict:
-        metrics = self.get_build_metrics(days)
-        
-        # Calculate trends
-        return {
-            'success_rate_trend': self._calculate_trend('success_rate', days),
-            'duration_trend': self._calculate_trend('duration', days),
-            'volume_trend': self._calculate_trend('builds_per_day', days)
-        }
-
-    def _calculate_trend(self, metric: str, days: int) -> float:
-        # Implementation of trend calculation
-        pass
+2. Install dependencies:
+```bash
+pip install -r requirements.txt
+npm install
 ```
 
-## API Endpoints
-
-### Build Management
-
-```
-GET /api/builds - List all builds
-GET /api/builds/{id} - Get build details
-POST /api/builds/trigger/{project} - Trigger new build
-GET /api/builds/{id}/logs - Get build logs
-GET /api/builds/{id}/artifacts - List build artifacts
+3. Run the development server:
+```bash
+python server.py
 ```
 
-### Authentication
-
-```
-POST /api/auth/login - User login
-POST /api/auth/refresh - Refresh token
+4. Start the dashboard:
+```bash
+npm run dev
 ```
 
-### Analytics
+### Testing
 
+```bash
+# Backend tests
+python -m pytest
+
+# Frontend tests
+npm run test
 ```
-GET /api/analytics/metrics - Get build metrics
-GET /api/analytics/trends - Get build trends
+
+## Deployment
+
+### AWS Deployment
+
+1. Deploy infrastructure:
+```bash
+terraform init
+terraform apply
 ```
+
+2. Configure API Gateway:
+```bash
+aws apigateway create-websocket-api \
+  --name "BuildDashboardAPI" \
+  --protocol-type WEBSOCKET
+```
+
+3. Deploy application:
+```bash
+./deploy.sh
+```
+
+## Monitoring
+
+### CloudWatch Metrics
+- WebSocket connection count
+- Message processing latency
+- Build duration
+- Error rates
+
+### Logging
+- Build logs in CloudWatch
+- Agent connection logs
+- Build state transitions
+
+## Security
+
+### WebSocket Security
+- API key authentication
+- JWT for client connections
+- Message validation
+- Rate limiting
+
+### Data Protection
+- In-transit encryption (WSS)
+- At-rest encryption (S3/DynamoDB)
+- Access logging
 
 ## Contributing
 
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+3. Commit your changes (`git commit -m 'Add feature'`)
 4. Push to the branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
 
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Acknowledgments
+
+- pytorch HUD
+- AWS WebSocket API
+- SendGrid API
+- ML Compiler Communities
