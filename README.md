@@ -178,7 +178,7 @@ app.post('/api/auth/login', login);
 
 1. Start local services:
 ```bash
-docker-compose up -d mongodb
+docker-compose up -d mysql
 ```
 
 2. Install dependencies:
