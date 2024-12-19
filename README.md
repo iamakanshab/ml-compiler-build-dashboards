@@ -27,18 +27,17 @@ The system uses a WebSocket-based architecture for real-time communication:
 ### System Requirements
 - Python 3.8+
 - Node.js 18+
-- MongoDB
+- MySQL
 - AWS Account
-- SendGrid Account
 
 ### Dependencies
 
 ```bash
 # Backend
-pip install flask flask-cors gitpython pymongo boto3 python-jose[cryptography] sendgrid
+pip install flask flask-cors gitpython pymongo boto3 python-jose[cryptography] 
 
 # Frontend
-npm install @sendgrid/mail aws-sdk bcrypt jsonwebtoken
+npm install aws-sdk bcrypt jsonwebtoken
 ```
 
 ## Configuration
@@ -67,7 +66,7 @@ JWT_SECRET_KEY=your_jwt_secret
 JWT_ALGORITHM=HS256
 
 # Notifications
-SENDGRID_API_KEY=your_sendgrid_key
+SECRET_API_KEY=your_enter_key
 NOTIFICATION_EMAIL=builds@your-domain.com
 ```
 
@@ -271,5 +270,4 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 - pytorch HUD
 - AWS WebSocket API
-- SendGrid API
 - ML Compiler Communities
