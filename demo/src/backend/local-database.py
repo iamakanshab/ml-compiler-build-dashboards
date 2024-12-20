@@ -175,7 +175,6 @@ if __name__ == "__main__":
     workflow_run_values = []
     i = 0
     for workflow_run in workflow_runs:
-        print(i)
         if i > 1_000: break
         workflow_run_values.append(get_workflow_run_row(workflow_run, c))
         i += 1
