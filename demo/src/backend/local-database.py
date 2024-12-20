@@ -52,7 +52,7 @@ if __name__ == "__main__":
     c.execute(
         """
             CREATE TABLE workflowruns (
-                id INTEGER PRIMARY KEY, --Auto incrementing primary key
+                id INTEGER PRIMARY KEY, --Auto incrementing primary key 
                 branch INTEGER NOT NULL, --Foreign key column
                 commitid INTEGER NOT NULL, --Foreign key column
                 workflow INTEGER NOT NULL, --Foreign key column
@@ -109,8 +109,14 @@ if __name__ == "__main__":
         createtime = time.mktime(workflow_run.created_at.timetuple())
         starttime = time.mktime(workflow_run.run_started_at.timetuple())
         endtime = time.mktime(workflow_run.updated_at.timetuple())
-        queuetime = starttime - createtime
-        runtime = endtime - starttime
+        if staus != "queued":
+            queuetime = starttime - createtime
+        else:
+            queuetime = endtime - createtime
+        try:
+            runtime = workflow_run.timing().run_duration_ms / 100
+        except:
+            runtime =  endtime - starttime
         return (
             branch_id,
             commit_id,
@@ -166,9 +172,12 @@ if __name__ == "__main__":
     print("POPULATING WORKFLOW RUNS")
 
     workflow_runs = repo.get_workflow_runs()
-    workflow_run_values = [
-        get_workflow_run_row(workflow_run, c) for workflow_run in workflow_runs
-    ]
+    workflow_run_values = []
+    i = 0
+    for workflow_run in workflow_runs:
+        if i > 1_000: break
+        workflow_run_values.append(get_workflow_run_row(workflow_run, c))
+        i += 1
     c.executemany(
         "INSERT OR REPLACE INTO workflowruns (branch, commitid, workflow, author, runtime, createtime, starttime, endtime, queuetime, status, conclusion, url, gitid, archivedbranchname, archivedcommithash, archivedworkflowname) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         workflow_run_values,
