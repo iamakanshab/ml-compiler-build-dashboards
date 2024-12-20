@@ -38,7 +38,7 @@ class Dashboard:
         if "commits" in data:
             self.add_commit(data)
         # handle new workflow run
-        if data.get("action") == "completed" and "workflow_run" in data:
+        if "workflow_run" in data:
             self.add_workflow_run(data)
         return "", 200
 
@@ -97,10 +97,13 @@ class Dashboard:
         started_at_dt = datetime.datetime.fromisoformat(
             workflow_run.get("run_started_at").replace("Z", "")
         )
-        runtime = (updated_at_dt - created_at_dt).total_seconds()
         try:
-            queue_time = (started_at_dt - created_at_dt).total_seconds()
+            runtime = workflow_run.timing().run_duration_ms / 100
         except:
+            runtime = (updated_at_dt - started_at_dt).total_seconds()
+        if status == "queued":
+            queue_time = (started_at_dt - created_at_dt).total_seconds()
+        else:
             queue_time = (updated_at_dt - created_at_dt).total_seconds()
         created_at = time.mktime(created_at_dt.timetuple())
         updated_at = time.mktime(updated_at_dt.timetuple())
