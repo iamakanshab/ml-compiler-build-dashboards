@@ -24,7 +24,7 @@ class Dashboard:
         self.port = port
 
     def start(self):
-        self.app.run(port=self.port, debug=True)
+        self.app.run(host='0.0.0.0', port=self.port, debug=True)
 
     def stop(self):
         pass
@@ -53,6 +53,8 @@ class Dashboard:
             commit_hash = commit.get("id")
             author = data.get("author", {}).get("name")
             message = commit.get("message")
+            commit_time = data.get("author, {}").get("date")
+            commit_time = time.mktime(commit_time.timetuple())
             c.execute(
                 "INSERT OR REPLACE INTO commits (hash, author, message) VALUES (?, ?, ?)",
                 (commit_hash, author, message),
