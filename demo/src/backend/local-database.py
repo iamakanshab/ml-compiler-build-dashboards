@@ -32,7 +32,8 @@ if __name__ == "__main__":
                 id INTEGER PRIMARY KEY, --Auto-incrementing primary key
                 hash TEXT UNIQUE NOT NULL,
                 author TEXT,
-                message TEXT
+                message TEXT,
+                time REAL NOT NULL
             )
             """
     )
@@ -109,7 +110,7 @@ if __name__ == "__main__":
         createtime = time.mktime(workflow_run.created_at.timetuple())
         starttime = time.mktime(workflow_run.run_started_at.timetuple())
         endtime = time.mktime(workflow_run.updated_at.timetuple())
-        if staus != "queued":
+        if status != "queued":
             queuetime = starttime - createtime
         else:
             queuetime = endtime - createtime
@@ -150,11 +151,11 @@ if __name__ == "__main__":
 
     commits = repo.get_commits()
     commit_values = [
-        (str(commit.sha), commit.commit.author.name, commit.commit.message)
+        (str(commit.sha), commit.commit.author.name, commit.commit.message, time.mktime(commit.commit.author.date.timetuple()))
         for commit in commits
     ]
     c.executemany(
-        "INSERT OR REPLACE INTO commits (hash, author, message) VALUES (?, ?, ?)",
+        "INSERT OR REPLACE INTO commits (hash, author, message, time) VALUES (?, ?, ?, ?)",
         commit_values,
     )
     conn.commit()
