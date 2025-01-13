@@ -10,77 +10,96 @@ if __name__ == "__main__":
     parser.add_argument('-db', '--database', help="database file in .db format")
     parser.add_argument('-r', '--repo', help="repository to scrape data from")
     parser.add_argument('-k', "--key", help="repository key")
+    parser.add_argument('-i', "--init", action="store_true", help="add this flag to reinit the database file")
+    parser.add_argument('-m', '--max_runs', type=int, default = -1, help="Maximum workflow runs to scrape")
     args = parser.parse_args()
+    if args.init and os.path.exists(args.database):
+        os.remove(args.database)
     conn = sqlite3.connect(args.database)
     c = conn.cursor()
     c.execute("PRAGMA foreign_keys = ON;")
 
-    c.execute(
-        """
-            CREATE TABLE branches (
-                id INTEGER PRIMARY KEY, --Auto-incrementing primary key
-                name TEXT UNIQUE NOT NULL,
-                author TEXT
-            )
+    if args.init:
+        c.execute(
             """
-    )
-    conn.commit()
+                CREATE TABLE repos (
+                    id INTEGER PRIMARY KEY, --Auto-incrementing primary key
+                    name TEXT UNIQUE NOT NULL
+                )
+            """
+        )
+        conn.commit()
 
-    c.execute(
-        """
-            CREATE TABLE commits (
-                id INTEGER PRIMARY KEY, --Auto-incrementing primary key
-                hash TEXT UNIQUE NOT NULL,
-                author TEXT,
-                message TEXT,
-                time REAL NOT NULL
-            )
+        c.execute(
             """
-    )
-    conn.commit()
+                CREATE TABLE branches (
+                    id INTEGER PRIMARY KEY, --Auto-incrementing primary key
+                    name TEXT UNIQUE NOT NULL,
+                    author TEXT,
+                    repo TEXT NOT NULL
+                )
+                """
+        )
+        conn.commit()
 
-    c.execute(
-        """
-            CREATE TABLE workflows (
-                id INTEGER PRIMARY KEY, --Auto incrementing primary key
-                name TEXT UNIQUE NOT NULL,
-                url TEXT NOT NULL
-            )
+        c.execute(
             """
-    )
-    conn.commit()
+                CREATE TABLE commits (
+                    id INTEGER PRIMARY KEY, --Auto-incrementing primary key
+                    hash TEXT UNIQUE NOT NULL,
+                    author TEXT,
+                    message TEXT,
+                    time REAL NOT NULL,
+                    repo TEXT NOT NULL
+                )
+                """
+        )
+        conn.commit()
 
-    c.execute(
-        """
-            CREATE TABLE workflowruns (
-                id INTEGER PRIMARY KEY, --Auto incrementing primary key 
-                branch INTEGER NOT NULL, --Foreign key column
-                commitid INTEGER NOT NULL, --Foreign key column
-                workflow INTEGER NOT NULL, --Foreign key column
-                author TEXT,
-                runtime REAL DEFAULT 0.0,
-                createtime REAL,
-                starttime REAL,
-                endtime REAL,
-                queuetime REAL DEFAULT 0.0,
-                status TEXT,
-                conclusion TEXT,
-                url TEXT,
-                gitid INT UNIQUE,
-                archivedbranchname TEXT,
-                archivedcommithash TEXT,
-                archivedworkflowname TEXT
-            )
+        c.execute(
             """
-    )
-    conn.commit()
+                CREATE TABLE workflows (
+                    id INTEGER PRIMARY KEY, --Auto incrementing primary key
+                    name TEXT UNIQUE NOT NULL,
+                    url TEXT NOT NULL,
+                    repo TEXT NOT NULL
+                )
+                """
+        )
+        conn.commit()
+
+        c.execute(
+            """
+                CREATE TABLE workflowruns (
+                    id INTEGER PRIMARY KEY, --Auto incrementing primary key 
+                    branch INTEGER NOT NULL, --Foreign key column
+                    commitid INTEGER NOT NULL, --Foreign key column
+                    workflow INTEGER NOT NULL, --Foreign key column
+                    author TEXT,
+                    runtime REAL DEFAULT 0.0,
+                    createtime REAL,
+                    starttime REAL,
+                    endtime REAL,
+                    queuetime REAL DEFAULT 0.0,
+                    status TEXT,
+                    conclusion TEXT,
+                    url TEXT,
+                    gitid INT UNIQUE,
+                    archivedbranchname TEXT,
+                    archivedcommithash TEXT,
+                    archivedworkflowname TEXT,
+                    repo TEXT NOT NULL
+                )
+                """
+        )
+        conn.commit()
 
     print("POPULATING DATABASE")
     github = Github(args.key)
     repo = github.get_repo(args.repo)
 
 
-    def get_workflow_run_row(workflow_run, c):
+    def get_workflow_run_row(workflow_run, c, repo):
         branch = workflow_run.head_branch
         c.execute("SELECT id FROM branches WHERE name = ?", (branch,))
         try:
@@ -135,15 +154,19 @@ if __name__ == "__main__":
             branch,
             commit,
             workflow_name,
+            repo
         )
+    
+    print("POPULATING REPO")
 
+    c.execute("INSERT OR REPLACE INTO repos (name) VALUES (?)", (args.repo, ))
 
     print("POPULATING BRANCHES")
 
     branches = repo.get_branches()
-    branch_values = [(branch.name,) for branch in branches]
+    branch_values = [(branch.name, args.repo) for branch in branches]
     c.executemany(
-        "INSERT OR REPLACE INTO branches (name) VALUES (?)", branch_values
+        "INSERT OR REPLACE INTO branches (name, repo) VALUES (?, ?)", branch_values
     )
     conn.commit()
 
@@ -151,11 +174,11 @@ if __name__ == "__main__":
 
     commits = repo.get_commits()
     commit_values = [
-        (str(commit.sha), commit.commit.author.name, commit.commit.message, time.mktime(commit.commit.author.date.timetuple()))
+        (str(commit.sha), commit.commit.author.name, commit.commit.message, time.mktime(commit.commit.author.date.timetuple()), args.repo)
         for commit in commits
     ]
     c.executemany(
-        "INSERT OR REPLACE INTO commits (hash, author, message, time) VALUES (?, ?, ?, ?)",
+        "INSERT OR REPLACE INTO commits (hash, author, message, time, repo) VALUES (?, ?, ?, ?, ?)",
         commit_values,
     )
     conn.commit()
@@ -163,9 +186,9 @@ if __name__ == "__main__":
     print("POPULATING WORKFLOWS")
 
     workflows = repo.get_workflows()
-    workflow_values = [(workflow.name, workflow.url) for workflow in workflows]
+    workflow_values = [(workflow.name, workflow.url, args.repo) for workflow in workflows]
     c.executemany(
-        "INSERT OR REPLACE INTO workflows (name, url) VALUES (?, ?)",
+        "INSERT OR REPLACE INTO workflows (name, url, repo) VALUES (?, ?, ?)",
         workflow_values,
     )
     conn.commit()
@@ -176,11 +199,11 @@ if __name__ == "__main__":
     workflow_run_values = []
     i = 0
     for workflow_run in workflow_runs:
-        if i > 1_000: break
-        workflow_run_values.append(get_workflow_run_row(workflow_run, c))
+        if i > args.max_runs and args.max_runs != -1: break
+        workflow_run_values.append(get_workflow_run_row(workflow_run, c, args.repo))
         i += 1
     c.executemany(
-        "INSERT OR REPLACE INTO workflowruns (branch, commitid, workflow, author, runtime, createtime, starttime, endtime, queuetime, status, conclusion, url, gitid, archivedbranchname, archivedcommithash, archivedworkflowname) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT OR REPLACE INTO workflowruns (branch, commitid, workflow, author, runtime, createtime, starttime, endtime, queuetime, status, conclusion, url, gitid, archivedbranchname, archivedcommithash, archivedworkflowname, repo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         workflow_run_values,
     )
     conn.commit()

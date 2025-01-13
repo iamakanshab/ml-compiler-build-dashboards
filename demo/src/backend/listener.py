@@ -56,8 +56,8 @@ class Dashboard:
             commit_time = data.get("author, {}").get("date")
             commit_time = time.mktime(commit_time.timetuple())
             c.execute(
-                "INSERT OR REPLACE INTO commits (hash, author, message) VALUES (?, ?, ?)",
-                (commit_hash, author, message),
+                "INSERT OR REPLACE INTO commits (hash, author, message, repo) VALUES (?, ?, ?, ?)",
+                (commit_hash, author, message, self.repo_path),
             )
         conn.commit()
         conn.close()
@@ -70,8 +70,8 @@ class Dashboard:
         branch_name = data.get("ref")
         author = data.get("sender", {}).get("login")
         c.execute(
-            "INSERT OR REPLACE INTO branches (name, author) VALUES (?, ?)",
-            (branch_name, author),
+            "INSERT OR REPLACE INTO branches (name, author, repo) VALUES (?, ?, ?)",
+            (branch_name, author, self.repo_path),
         )
         conn.commit()
         conn.close()
@@ -129,7 +129,7 @@ class Dashboard:
             print(f"No workflow id found for {workflow_name}")
             workflow_id = -1
         c.execute(
-            "INSERT OR REPLACE INTO workflowruns (branch, commitid, workflow, author, runtime, createtime, starttime, endtime, queuetime, status, conclusion, url, gitid, archivedbranchname, archivedcommithash, archivedworkflowname) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT OR REPLACE INTO workflowruns (branch, commitid, workflow, author, runtime, createtime, starttime, endtime, queuetime, status, conclusion, url, gitid, archivedbranchname, archivedcommithash, archivedworkflowname, repo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 branch_id,
                 commit_id,
@@ -147,6 +147,7 @@ class Dashboard:
                 branch_name,
                 commit_hash,
                 workflow_name,
+                self.repo_path
             ),
         )
         conn.commit()
