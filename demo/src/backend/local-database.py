@@ -12,6 +12,7 @@ if __name__ == "__main__":
     parser.add_argument('-k', "--key", help="repository key")
     parser.add_argument('-i', "--init", action="store_true", help="add this flag to reinit the database file")
     parser.add_argument('-m', '--max_runs', type=int, default = -1, help="Maximum workflow runs to scrape")
+    parser.add_argument('-t', '--last_time', type=int, default = 0, help="Only scrape data back to this date")
     args = parser.parse_args()
     if args.init and os.path.exists(args.database):
         os.remove(args.database)
@@ -99,7 +100,9 @@ if __name__ == "__main__":
     repo = github.get_repo(args.repo)
 
 
-    def get_workflow_run_row(workflow_run, c, repo):
+    def get_workflow_run_row(workflow_run, dbfile, repo):
+        conn = sqlite3.connect(dbfile)
+        c = conn.cursor()
         branch = workflow_run.head_branch
         c.execute("SELECT id FROM branches WHERE name = ?", (branch,))
         try:
@@ -121,6 +124,7 @@ if __name__ == "__main__":
         except:
             print(f"No workflow id found for {workflow_name}")
             workflow_id = -1
+        conn.close()
         url = workflow_run.url
         gitid = workflow_run.id
         author = workflow_run.actor.login
@@ -156,19 +160,27 @@ if __name__ == "__main__":
             workflow_name,
             repo
         )
+    conn.close()
     
     print("POPULATING REPO")
 
+    conn = sqlite3.connect(args.database)
+    c = conn.cursor()
     c.execute("INSERT OR REPLACE INTO repos (name) VALUES (?)", (args.repo, ))
+    conn.commit()
+    conn.close()
 
     print("POPULATING BRANCHES")
 
     branches = repo.get_branches()
     branch_values = [(branch.name, args.repo) for branch in branches]
+    conn = sqlite3.connect(args.database)
+    c = conn.cursor()
     c.executemany(
         "INSERT OR REPLACE INTO branches (name, repo) VALUES (?, ?)", branch_values
     )
     conn.commit()
+    conn.close()
 
     print("POPULATING COMMITS")
 
@@ -177,21 +189,28 @@ if __name__ == "__main__":
         (str(commit.sha), commit.commit.author.name, commit.commit.message, time.mktime(commit.commit.author.date.timetuple()), args.repo)
         for commit in commits
     ]
+    conn = sqlite3.connect(args.database)
+    c = conn.cursor()
+    print("ADDING COMMITS")
     c.executemany(
         "INSERT OR REPLACE INTO commits (hash, author, message, time, repo) VALUES (?, ?, ?, ?, ?)",
         commit_values,
     )
     conn.commit()
+    conn.close()
 
     print("POPULATING WORKFLOWS")
 
     workflows = repo.get_workflows()
     workflow_values = [(workflow.name, workflow.url, args.repo) for workflow in workflows]
+    conn = sqlite3.connect(args.database)
+    c = conn.cursor()
     c.executemany(
         "INSERT OR REPLACE INTO workflows (name, url, repo) VALUES (?, ?, ?)",
         workflow_values,
     )
     conn.commit()
+    conn.close()
 
     print("POPULATING WORKFLOW RUNS")
 
@@ -200,16 +219,16 @@ if __name__ == "__main__":
     i = 0
     for workflow_run in workflow_runs:
         if i > args.max_runs and args.max_runs != -1: break
-        workflow_run_values.append(get_workflow_run_row(workflow_run, c, args.repo))
+        workflow_run_input = get_workflow_run_row(workflow_run, args.database, args.repo)
+        workflow_run_values.append(workflow_run_input)
+        if args.last_time > workflow_run_input[6]: break
         i += 1
+    conn = sqlite3.connect(args.database)
+    c = conn.cursor()
+    print("ADDING WORKFLOW RUNS")
     c.executemany(
         "INSERT OR REPLACE INTO workflowruns (branch, commitid, workflow, author, runtime, createtime, starttime, endtime, queuetime, status, conclusion, url, gitid, archivedbranchname, archivedcommithash, archivedworkflowname, repo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         workflow_run_values,
     )
-    conn.commit()
-
-    if __name__ == "__main__":
-        print("TESTING DB")
-
     conn.commit()
     conn.close()
