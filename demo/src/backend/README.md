@@ -2,11 +2,19 @@
 
 This code works as a backend to listen for changes to monitered repositories and update the database underlying the dashboard.
 
-## Step 1: Initialization
+# Using the backend
+
+If you are not maintaining the backend, you can access and query the database by using the connector object defined in sqlauthenticator.py
+```
+from sqlauthenticator import connector
+conn = connector(password)
+```
+from here conn can be used like an sqlite3 connector.  Be sure to close it when you are finished querying if your script runs for a while to avoid locking out the listener
+
+# Initializing the backend 
 
 to initialize the backend database, run the `local-database.py` script with the following arguments:
 
-`-db`: the database file you want to write to.  It should have the suffix `.db` and should not already exist.  If it does already exist, remove it first
 
 `-r`: the repo you want to pull from, should be in the format `'iree-org/iree'`
 
@@ -14,26 +22,24 @@ to initialize the backend database, run the `local-database.py` script with the 
 
 `-m`: the max number of workflows to scrape. You might want to set this for larger repositories
 
-`-i`: Initialize. use this if you want to reset the `.db`. 
+`-pwd`: The password to the Azure Database
 
 The full command should look like this
 ```
-python local-database.py -db /home/user/dashboard-test/ml-compiler-build-dashboards/demo/iree-repo.db -r "iree-org/iree" -k "ghp_putyourkeyhere"
+python local-database.py -r "iree-org/iree" -k "your key here" -m 1000 -pwd password
 ```
 
 ##Step 2: Listener
 
-To run the listener, you need the same arguments as above, except there is an optional `-p` port argument. if no port is given, it will use `5000`. There is also ni optional `-i` or `-m` flags
+To run the listener, you need the same arguments as above, except there is an optional `-p` port argument. if no port is given, it will use `5000`. There is also no optional `-m` flag
 
 Make sure that that port is exposed, and that the url it is exposed on is in a webhook in the repository you are monitering, otherwise it will not recieve live updates
 
 The full command should look like this:
 ```
-python listener.py -db /home/user/dashboard-test/ml-compiler-build-dashboards/demo/iree-repo.db -r "iree-org/iree" -k "ghp_putyourkeyhere" -p 5000
+python listener.py -r "iree-org/iree" -k "ghp_putyourkeyhere" -p 5000 -pwd password
 ```
-## Step 3: Using the backend
 
-The listener will constantly update the `.db` file provided.  to get data for visualizations or analysis, use the `sqlite3` package and query the `.db` file.
 
 # Maintenance
 
