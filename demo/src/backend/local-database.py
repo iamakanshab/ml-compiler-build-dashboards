@@ -197,7 +197,7 @@ if __name__ == "__main__":
                 INSERT (gitid, author, runtime, createtime, starttime, endtime, queuetime, status, conclusion, url, branchname, commithash, workflowname, repo) 
                 VALUES (source.gitid, source.author, source.runtime, source.createtime, source.starttime, source.endtime, source.queuetime, source.status, source.conclusion, source.url, source.branchname, source.commithash, source.workflowname, source.repo);
             """,
-            workflow_run_values,
+            workflow_run_value,
         )
     conn.commit()
     conn.close()
